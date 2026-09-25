@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CineTelegram - Mini App de Películas & Monetag</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        tg: {
+                            bg: 'var(--tg-theme-bg-color, #0f172a)',
+                            secondary: 'var(--tg-theme-secondary-bg-color, #1e293b)',
+                            text: 'var(--tg-theme-text-color, #f8fafc)',
+                            button: 'var(--tg-theme-button-color, #3b82f6)',
+                            buttonText: 'var(--tg-theme-button-text-color, #ffffff)',
+                            accent: '#0088cc',
+                            monetag: '#22c55e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar and sleek Telegram integration */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .aspect-poster {
+            aspect-ratio: 2 / 3;
+        }
+        .backdrop-blur-custom {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white pb-20">
+
+    <!-- Header Principal (100% Limpio sin botones de Admin) -->
+    <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-custom border-b border-slate-800 px-4 py-3 shadow-lg">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <!-- Secret Admin Trigger: Tap Logo 3 Times -->
+                <button onclick="handleLogoClick()" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20 text-white font-bold text-lg active:scale-95 transition-transform focus:outline-none" title="CineFlix">
+                    <i class="fa-solid font-black fa-play text-sm"></i>
+                </button>
+                <div>
+                    <h1 class="font-bold text-base tracking-wide flex items-center gap-2">
+                        CineFlix
+                    </h1>
+                    <p class="text-xs text-slate-400 flex items-center gap-1" id="tg-user-greeting">
+                        <i class="fa-solid fa-user-circle text-slate-500"></i> Cargando usuario...
+                    </p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content Wrapper -->
+    <main class="max-w-4xl mx-auto w-full px-4 pt-4 flex-grow">
+
+        <!-- Dynamic Monetag In-Page Push Placeholder (Hiddenly Injected for Ads) -->
+        <div id="monetag-inpage-slot" class="mb-4 hidden">
+            <!-- Monetag scripts injected dynamically here -->
+        </div>
+
+        <!-- Tab Views Container -->
+        
+        <!-- ================= TAB 1: CATALOG / MOVIES ================= -->
+        <section id="tab-catalog" class="tab-content space-y-4">
+            <!-- Search & Filters -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-grow">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                    <input type="text" id="search-input" onkeyup="filterMovies()" placeholder="Buscar película por título..." 
+                           class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-500 transition-all">
+                </div>
+                <select id="genre-filter" onchange="filterMovies()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500">
+                    <option value="ALL">Todas las Categorías</option>
+                    <option value="Acción">Acción</option>
+                    <option value="Sci-Fi">Sci-Fi</option>
+                    <option value="Animación">Animación</option>
+                    <option value="Drama">Drama</option>
+                    <option value="Terror">Terror</option>
+                </select>
+            </div>
+
+            <!-- Movies Grid Header -->
+            <div class="flex items-center justify-between pt-2">
+                <h2 class="text-sm font-bold tracking-wider uppercase text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-film text-blue-500"></i> Catálogo de Películas
+                </h2>
+                <span class="text-xs text-slate-500" id="movie-count">0 películas</span>
+            </div>
+
+            <!-- Movies Grid -->
+            <div id="movies-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Movie Cards injected here via JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= SECRET ADMIN MODAL (PROTECTED) ================= -->
+    <div id="admin-login-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative">
+            <button onclick="closeAdminLoginModal()" class="absolute right-4 top-4 text-slate-500 hover:text-slate-300">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="w-14 h-14 rounded-2xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400 text-2xl font-black">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+
+            <div class="space-y-1">
+                <h3 class="text-base font-bold text-slate-100">Acceso Privado</h3>
+                <p class="text-xs text-slate-400">Ingresa tu clave PIN de seguridad.</p>
+            </div>
+
+            <form onsubmit="verifyAdminPin(event)" class="space-y-3">
+                <input type="password" id="admin-pin-input" maxlength="6" placeholder="PIN Secreto" required
+                       class="w-full text-center tracking-widest text-lg font-bold bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm">
+                    Ingresar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= ADMIN MANAGEMENT DASHBOARD MODAL ================= -->
+    <div id="admin-dashboard-modal" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex-col p-4 overflow-y-auto">
+        <div class="max-w-2xl mx-auto w-full space-y-6 my-auto py-6">
+            
+            <!-- Dashboard Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-100">Panel Privado de Control</h2>
+                        <p class="text-xs text-slate-400">Configuración exclusiva para el dueño de la app</p>
+                    </div>
+                </div>
+                <button onclick="closeAdminDashboardModal()" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Sub-tabs inside Admin Dashboard -->
+            <div class="flex border-b border-slate-800 text-xs font-semibold gap-4">
+                <button onclick="switchAdminTab('monetag')" id="admin-tab-btn-monetag" class="pb-2 border-b-2 border-emerald-500 text-emerald-400">
+                    <i class="fa-solid fa-sack-dollar mr-1"></i> Monetización Monetag
+                </button>
+                <button onclick="switchAdminTab('add')" id="admin-tab-btn-add" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-plus-circle mr-1"></i> Agregar Película
+                </button>
+                <button onclick="switchAdminTab('manage')" id="admin-tab-btn-manage" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-list-check mr-1"></i> Gestionar Películas
+                </button>
+            </div>
+
+            <!-- ADMIN TAB 1: MONETAG CONFIG -->
+            <div id="admin-sec-monetag" class="space-y-4">
+                <form onsubmit="saveMonetagSettings(event)" class="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">
+                            Tu Enlace Direct Link de Monetag (SmartLink) *
+                        </label>
+                        <input type="url" id="monetag-direct-url" required placeholder="https://ototwo.com/4/8888888" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+                        <p class="text-[11px] text-slate-500 mt-1">Este enlace ganará dinero cada vez que un usuario intente reproducir una película.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">
+                            Código Script de In-Page Push / Banner (Opcional)
+                        </label>
+                        <textarea id="monetag-script-code" rows="3" placeholder="<script src='//thubanoa.com/...'></script>" 
+                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500"></textarea>
+                    </div>
+
+                    <!-- Cloud Sync via JSONBin for Global Persistence -->
+                    <div class="border-t border-slate-800 pt-3 space-y-2">
+                        <label class="block text-xs font-semibold text-emerald-400">
+                            <i class="fa-solid fa-cloud mr-1"></i> Sincronización Global en la Nube (Opcional - JSONBin.io)
+                        </label>
+                        <p class="text-[11px] text-slate-400">Permite sincronizar películas en tiempo real con todos tus usuarios:</p>
+                        <input type="text" id="jsonbin-bin-id" placeholder="Bin ID (Ej. 65f12345a678...)" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+                        <input type="password" id="jsonbin-api-key" placeholder="Master Key de JSONBin" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">
+                            Cambiar PIN de Acceso Admin
+                        </label>
+                        <input type="password" id="change-admin-pin" placeholder="Ingresa nuevo PIN (4 dígitos)" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Guardar Configuración Privada</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- ADMIN TAB 2: ADD MOVIE FORM -->
+            <div id="admin-sec-add" class="hidden space-y-4">
+                <form id="add-movie-form" onsubmit="handleAddMovie(event)" class="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Título de la Película *</label>
+                        <input type="text" id="movie-title" required placeholder="Ej. Avatar: El Camino del Agua" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría *</label>
+                            <select id="movie-category" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                                <option value="Acción">Acción</option>
+                                <option value="Sci-Fi">Sci-Fi / Ciencia Ficción</option>
+                                <option value="Animación">Animación</option>
+                                <option value="Drama">Drama / Suspenso</option>
+                                <option value="Terror">Terror</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Calidad</label>
+                            <input type="text" id="movie-quality" placeholder="Ej. 1080p HD" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">URL de la Imagen de Portada (Poster JPG/PNG) *</label>
+                        <input type="url" id="movie-poster" required placeholder="https://m.media-amazon.com/images/M/..." 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">URL de Reproducción (MP4 / Embed) *</label>
+                        <input type="url" id="movie-stream-url" required placeholder="https://ejemplo.com/embed/pelicula o archivo .mp4" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Sinopsis de la Película</label>
+                        <textarea id="movie-desc" rows="2" placeholder="Resumen de la película..." 
+                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Agregar Película al Catálogo</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- ADMIN TAB 3: MANAGE / DELETE MOVIES -->
+            <div id="admin-sec-manage" class="hidden space-y-3">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs text-slate-400">Películas en el catálogo</span>
+                    <button onclick="copyGithubCode()" class="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1">
+                        <i class="fa-solid fa-code"></i> Copiar Código para GitHub
+                    </button>
+                </div>
+                <div id="admin-movies-list" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    <!-- Dynamic movie list with delete buttons -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ================= VIDEO PLAYER MODAL ================= -->
+    <div id="player-modal" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex-col justify-between p-2 sm:p-4 transition-all">
+        <!-- Player Header -->
+        <div class="flex items-center justify-between bg-slate-900/80 px-4 py-3 rounded-2xl border border-slate-800 mb-2">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <button onclick="closePlayer()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="truncate">
+                    <h3 id="player-title" class="font-bold text-sm text-slate-100 truncate">Título de la Película</h3>
+                    <span id="player-category" class="text-[11px] text-blue-400 font-medium">Categoría</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container Frame / HTML5 Video Dynamic Injection -->
+        <div class="flex-grow flex items-center justify-center w-full relative rounded-2xl overflow-hidden bg-black border border-slate-800">
+            <div id="player-container" class="w-full h-full flex items-center justify-center">
+                <!-- Video tag or Iframe dynamically inserted here -->
+            </div>
+        </div>
+
+        <!-- Movie Description & Controls -->
+        <div class="mt-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+                <p id="player-desc" class="text-xs text-slate-300 line-clamp-2">Sinopsis de la película seleccionada.</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="shareMovieTelegram()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/20">
+                    <i class="fa-solid fa-share-nodes"></i> Compartir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MONETAG AD GATE MODAL (USER VIEW) ================= -->
+    <div id="adgate-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative">
+            <button onclick="closeAdGate()" class="absolute right-4 top-4 text-slate-500 hover:text-slate-300">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center mx-auto text-slate-950 text-2xl font-black shadow-lg shadow-emerald-500/30">
+                <i class="fa-solid fa-play text-slate-950 ml-1"></i>
+            </div>
+
+            <div class="space-y-1">
+                <h3 class="text-lg font-bold text-slate-100">Desbloquear Película</h3>
+                <p class="text-xs text-slate-400">Presiona el botón para verificar el servidor y comenzar la reproducción en HD.</p>
+            </div>
+
+            <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 text-left flex items-center gap-3">
+                <img id="adgate-poster" src="" class="w-12 h-16 object-cover rounded-lg" alt="Poster">
+                <div class="overflow-hidden text-xs">
+                    <span class="text-slate-500 font-semibold uppercase text-[10px] block">Servidor Online</span>
+                    <strong id="adgate-title" class="text-slate-200 block truncate">Película</strong>
+                    <span class="text-emerald-400 font-medium text-[11px]"><i class="fa-solid fa-check-circle"></i> HD 1080p Disponible</span>
+                </div>
+            </div>
+
+            <button id="adgate-unlock-btn" onclick="executeAdGateUnlock()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3.5 rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-play-circle text-base"></i>
+                <span>Ver Película Ahora</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification System -->
+    <div id="toast-container" class="fixed top-16 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- Bottom Navigation Bar for Mobile -->
+    <nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur-custom border-t border-slate-800 px-6 py-2">
+        <div class="max-w-md mx-auto flex items-center justify-around">
+            <button onclick="switchTab('catalog')" id="nav-catalog" class="nav-btn active flex flex-col items-center gap-1 text-blue-500 transition-colors">
+                <i class="fa-solid fa-film text-lg"></i>
+                <span class="text-[10px] font-semibold">Películas</span>
+            </button>
+            <button onclick="filterByGenre('Acción')" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
+                <i class="fa-solid fa-fire text-lg"></i>
+                <span class="text-[10px] font-semibold">Acción</span>
+            </button>
+            <button onclick="filterByGenre('Animación')" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
+                <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                <span class="text-[10px] font-semibold">Animación</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Global State & Data
+        const DEFAULT_MOVIES = [
+            {
+                id: 'm_beetlejuice',
+                title: 'Beetlejuice, el súper fantasma',
+                category: 'Acción',
+                quality: '720p',
+                poster: 'https://m.media-amazon.com/images/M/MV5BMGNhADkxNjAtY2E1YS00MDk4LWE5NjktYzgwZTFhNWVhY2I4XkEyXkFqcGc@._V1_.jpg',
+                streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                desc: 'Un matrimonio de fantasmas contrata a un espíritu travieso para ahuyentar a los nuevos habitantes de su antigua casa.'
+            },
+            {
+                id: 'm1',
+                title: 'Big Buck Bunny (Demo MP4)',
+                category: 'Animación',
+                quality: '4K Ultra HD',
+                poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
+                streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                desc: 'Un conejo gigante de gran corazón lucha contra tres roedores traviesos en esta película animada de código abierto.'
+            },
+            {
+                id: 'm2',
+                title: 'Tears of Steel (Sci-Fi)',
+                category: 'Sci-Fi',
+                quality: '1080p HD',
+                poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Tears_of_Steel_poster.jpg/800px-Tears_of_Steel_poster.jpg',
+                streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+                desc: 'Un grupo de exploradores y soldados intentan rescatar a la tierra en un futuro distópico dominado por robots.'
+            }
+        ];
+
+        let movies = [];
+        let pendingMovieToPlay = null;
+        let logoClickCount = 0;
+        let logoClickTimer = null;
+
+        let adminPin = localStorage.getItem('cine_admin_pin') || '1998';
+        let isAdminUnlocked = false;
+
+        let monetagConfig = {
+            directUrl: localStorage.getItem('monetag_direct_url') || 'https://ototwo.com/4/8888888',
+            scriptCode: localStorage.getItem('monetag_script') || '',
+            jsonbinBinId: localStorage.getItem('jsonbin_bin_id') || '',
+            jsonbinApiKey: localStorage.getItem('jsonbin_api_key') || ''
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initTelegramApp();
+            checkSharedMovieInUrl();
+            loadMovies();
+            loadMonetagConfig();
+        });
+
+        function initTelegramApp() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+
+                const user = tg.initDataUnsafe?.user;
+                if (user) {
+                    const greetingEl = document.getElementById('tg-user-greeting');
+                    if (greetingEl) {
+                        greetingEl.innerHTML = `<i class="fa-solid fa-user-circle text-blue-400"></i> ${user.first_name || 'Usuario'}`;
+                    }
+                }
+            }
+        }
+
+        function checkSharedMovieInUrl() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const sharedData = urlParams.get('mdata');
+                if (sharedData) {
+                    const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
+                    if (decoded && decoded.id && decoded.title) {
+                        let saved = localStorage.getItem('cine_telegram_movies');
+                        let currentMovies = saved ? JSON.parse(saved) : [...DEFAULT_MOVIES];
+                        if (!currentMovies.some(m => m.id === decoded.id)) {
+                            currentMovies.unshift(decoded);
+                            localStorage.setItem('cine_telegram_movies', JSON.stringify(currentMovies));
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('Error parsing shared movie', e);
+            }
+        }
+
+        async function loadMovies() {
+            const saved = localStorage.getItem('cine_telegram_movies');
+            if (saved) {
+                try { movies = JSON.parse(saved); } catch (e) { movies = [...DEFAULT_MOVIES]; }
+            } else {
+                movies = [...DEFAULT_MOVIES];
+            }
+
+            // If JSONBin is configured, fetch latest list from Cloud
+            if (monetagConfig.jsonbinBinId && monetagConfig.jsonbinApiKey) {
+                try {
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${monetagConfig.jsonbinBinId}/latest`, {
+                        headers: { 'X-Master-Key': monetagConfig.jsonbinApiKey }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.record && Array.isArray(data.record)) {
+                            movies = data.record;
+                            localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
+                        }
+                    }
+                } catch (err) {
+                    console.log('Cloud sync fetch fallback to local storage');
+                }
+            }
+
+            renderMoviesGrid(movies);
+        }
+
+        async function saveMoviesState() {
+            localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
+
+            // Sync with JSONBin if configured
+            if (monetagConfig.jsonbinBinId && monetagConfig.jsonbinApiKey) {
+                try {
+                    await fetch(`https://api.jsonbin.io/v3/b/${monetagConfig.jsonbinBinId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': monetagConfig.jsonbinApiKey
+                        },
+                        body: JSON.stringify(movies)
+                    });
+                } catch (err) {
+                    console.log('Cloud sync error', err);
+                }
+            }
+        }
+
+        function handleAddMovie(e) {
+            e.preventDefault();
+            triggerHaptic('medium');
+
+            const title = document.getElementById('movie-title').value.trim();
+            const category = document.getElementById('movie-category').value;
+            const quality = document.getElementById('movie-quality').value.trim() || 'HD';
+            const poster = document.getElementById('movie-poster').value.trim();
+            const streamUrl = document.getElementById('movie-stream-url').value.trim();
+            const desc = document.getElementById('movie-desc').value.trim();
+
+            const newMovie = {
+                id: 'm_' + Date.now(),
+                title,
+                category,
+                quality,
+                poster,
+                streamUrl,
+                desc: desc || 'Película del catálogo'
+            };
+
+            movies.unshift(newMovie);
+            saveMoviesState();
+
+            showToast('Película agregada con éxito', 'success');
+            document.getElementById('add-movie-form').reset();
+            renderMoviesGrid(movies);
+            switchAdminTab('manage');
+        }
+
+        function deleteMovie(id) {
+            movies = movies.filter(m => m.id !== id);
+            saveMoviesState();
+            renderMoviesGrid(movies);
+            renderAdminManageList();
+            showToast('Película eliminada', 'info');
+        }
+
+        // Copia robusta: intenta la API moderna, si falla usa un textarea oculto + execCommand,
+        // y si todo falla muestra el texto para copiar a mano.
+        function copyToClipboardRobust(text, successMsg) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(successMsg, 'success');
+                }).catch(() => fallbackCopy(text, successMsg));
+            } else {
+                fallbackCopy(text, successMsg);
+            }
+        }
+
+        function fallbackCopy(text, successMsg) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                ta.style.top = '0';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) {
+                    showToast(successMsg, 'success');
+                } else {
+                    showManualCopyModal(text);
+                }
+            } catch (e) {
+                showManualCopyModal(text);
+            }
+        }
+
+        function showManualCopyModal(text) {
+            const existing = document.getElementById('manual-copy-modal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'manual-copy-modal';
+            modal.className = 'fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 max-w-sm w-full space-y-3 shadow-2xl">
+                    <h3 class="text-sm font-bold text-slate-100">Copia manual</h3>
+                    <p class="text-xs text-slate-400">Tu navegador no permitió copiar automáticamente. Selecciona el texto y cópialo con el gesto de tu teléfono (mantener presionado).</p>
+                    <textarea readonly class="w-full h-40 bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] font-mono text-slate-200" onclick="this.select()">${text.replace(/</g, '&lt;')}</textarea>
+                    <button onclick="document.getElementById('manual-copy-modal').remove()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-sm">Cerrar</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function copyGithubCode() {
+            const formattedCode = `const DEFAULT_MOVIES = ${JSON.stringify(movies, null, 4)};`;
+            copyToClipboardRobust(formattedCode, 'Código copiado. Pégalo en tu index.html de GitHub');
+        }
+
+        function loadMonetagConfig() {
+            document.getElementById('monetag-direct-url').value = monetagConfig.directUrl;
+            document.getElementById('monetag-script-code').value = monetagConfig.scriptCode;
+            document.getElementById('jsonbin-bin-id').value = monetagConfig.jsonbinBinId;
+            document.getElementById('jsonbin-api-key').value = monetagConfig.jsonbinApiKey;
+
+            if (monetagConfig.scriptCode) {
+                const slot = document.getElementById('monetag-inpage-slot');
+                slot.innerHTML = monetagConfig.scriptCode;
+                slot.classList.remove('hidden');
+            }
+        }
+
+        function saveMonetagSettings(e) {
+            e.preventDefault();
+            triggerHaptic('medium');
+
+            monetagConfig.directUrl = document.getElementById('monetag-direct-url').value.trim();
+            monetagConfig.scriptCode = document.getElementById('monetag-script-code').value.trim();
+            monetagConfig.jsonbinBinId = document.getElementById('jsonbin-bin-id').value.trim();
+            monetagConfig.jsonbinApiKey = document.getElementById('jsonbin-api-key').value.trim();
+
+            const newPin = document.getElementById('change-admin-pin').value.trim();
+            if (newPin && newPin.length >= 4) {
+                adminPin = newPin;
+                localStorage.setItem('cine_admin_pin', newPin);
+                document.getElementById('change-admin-pin').value = '';
+                showToast('PIN de Admin actualizado', 'success');
+            }
+
+            localStorage.setItem('monetag_direct_url', monetagConfig.directUrl);
+            localStorage.setItem('monetag_script', monetagConfig.scriptCode);
+            localStorage.setItem('jsonbin_bin_id', monetagConfig.jsonbinBinId);
+            localStorage.setItem('jsonbin_api_key', monetagConfig.jsonbinApiKey);
+
+            loadMonetagConfig();
+            loadMovies();
+            showToast('Ajustes guardados correctamente', 'success');
+            closeAdminDashboardModal();
+        }
+
+        function triggerHaptic(style = 'light') {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(style);
+            }
+        }
+
+        // Secret Logo Tap Handler (3 quick clicks to unlock Admin)
+        function handleLogoClick() {
+            logoClickCount++;
+            clearTimeout(logoClickTimer);
+            logoClickTimer = setTimeout(() => { logoClickCount = 0; }, 1200);
+
+            if (logoClickCount >= 3) {
+                logoClickCount = 0;
+                triggerHaptic('medium');
+                if (isAdminUnlocked) {
+                    openAdminDashboardModal();
+                } else {
+                    openAdminLoginModal();
+                }
+            }
+        }
+
+        function openAdminLoginModal() {
+            document.getElementById('admin-pin-input').value = '';
+            document.getElementById('admin-login-modal').classList.remove('hidden');
+        }
+
+        function closeAdminLoginModal() {
+            document.getElementById('admin-login-modal').classList.add('hidden');
+        }
+
+        function verifyAdminPin(e) {
+            e.preventDefault();
+            const enteredPin = document.getElementById('admin-pin-input').value.trim();
+            if (enteredPin === adminPin) {
+                isAdminUnlocked = true;
+                closeAdminLoginModal();
+                showToast('Acceso Admin Concedido', 'success');
+                openAdminDashboardModal();
+            } else {
+                showToast('PIN Incorrecto', 'warning');
+            }
+        }
+
+        function openAdminDashboardModal() {
+            document.getElementById('admin-dashboard-modal').classList.remove('hidden');
+            document.getElementById('admin-dashboard-modal').classList.add('flex');
+            renderAdminManageList();
+        }
+
+        function closeAdminDashboardModal() {
+            document.getElementById('admin-dashboard-modal').classList.add('hidden');
+            document.getElementById('admin-dashboard-modal').classList.remove('flex');
+        }
+
+        function switchAdminTab(tabName) {
+            document.getElementById('admin-sec-monetag').classList.add('hidden');
+            document.getElementById('admin-sec-add').classList.add('hidden');
+            document.getElementById('admin-sec-manage').classList.add('hidden');
+
+            document.getElementById('admin-tab-btn-monetag').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+            document.getElementById('admin-tab-btn-add').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+            document.getElementById('admin-tab-btn-manage').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+
+            if (tabName === 'monetag') {
+                document.getElementById('admin-sec-monetag').classList.remove('hidden');
+                document.getElementById('admin-tab-btn-monetag').className = "pb-2 border-b-2 border-emerald-500 text-emerald-400";
+            } else if (tabName === 'add') {
+                document.getElementById('admin-sec-add').classList.remove('hidden');
+                document.getElementById('admin-tab-btn-add').className = "pb-2 border-b-2 border-blue-500 text-blue-400";
+            } else if (tabName === 'manage') {
+                document.getElementById('admin-sec-manage').classList.remove('hidden');
+                document.getElementById('admin-tab-btn-manage').className = "pb-2 border-b-2 border-amber-500 text-amber-400";
+                renderAdminManageList();
+            }
+        }
+
+        function renderMoviesGrid(items) {
+            const grid = document.getElementById('movies-grid');
+            const countEl = document.getElementById('movie-count');
+            countEl.textContent = `${items.length} película${items.length === 1 ? '' : 's'}`;
+
+            if (items.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500">
+                        <i class="fa-solid fa-film text-4xl mb-2 opacity-50"></i>
+                        <p class="text-sm font-medium">No hay películas en esta sección</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = items.map(m => `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition-all flex flex-col justify-between group shadow-lg">
+                    <div class="relative aspect-poster bg-slate-950 overflow-hidden">
+                        <img src="${m.poster}" alt="${m.title}" 
+                             onerror="this.src='https://placehold.co/400x600/0f172a/94a3b8?text=Poster'"
+                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
+                        <span class="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-md text-blue-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-800">
+                            ${m.quality || 'HD'}
+                        </span>
+                        <button onclick="requestMoviePlay('${m.id}')" class="absolute inset-0 flex items-center justify-center bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg shadow-xl shadow-blue-600/50 scale-90 group-hover:scale-100 transition-transform">
+                                <i class="fa-solid fa-play ml-0.5"></i>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="p-3 space-y-1 flex-grow flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">${m.category}</span>
+                            <h3 class="font-bold text-xs text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title="${m.title}">${m.title}</h3>
+                        </div>
+                        <div class="pt-2 flex items-center justify-between gap-1 border-t border-slate-800/60">
+                            <button onclick="requestMoviePlay('${m.id}')" class="w-full bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-play text-[10px]"></i> Ver Película
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterMovies() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const genre = document.getElementById('genre-filter').value;
+
+            const filtered = movies.filter(m => {
+                const matchesSearch = m.title.toLowerCase().includes(query);
+                const matchesGenre = genre === 'ALL' || m.category === genre;
+                return matchesSearch && matchesGenre;
+            });
+
+            renderMoviesGrid(filtered);
+        }
+
+        function filterByGenre(genreName) {
+            document.getElementById('genre-filter').value = genreName;
+            filterMovies();
+        }
+
+        function renderAdminManageList() {
+            const container = document.getElementById('admin-movies-list');
+            if (movies.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">No hay películas creadas.</p>`;
+                return;
+            }
+
+            container.innerHTML = movies.map(m => `
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 truncate">
+                        <img src="${m.poster}" class="w-10 h-14 object-cover rounded-md" onerror="this.src='https://placehold.co/100x150/0f172a/94a3b8?text=Poster'">
+                        <div class="truncate text-xs">
+                            <strong class="text-slate-200 block truncate">${m.title}</strong>
+                            <span class="text-slate-500">${m.category} • ${m.quality}</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteMovie('${m.id}')" class="text-red-400 hover:text-red-300 p-2 text-sm shrink-0" title="Eliminar">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function requestMoviePlay(movieId) {
+            triggerHaptic('light');
+            const movie = movies.find(m => m.id === movieId);
+            if (!movie) return;
+
+            pendingMovieToPlay = movie;
+
+            if (monetagConfig.directUrl && monetagConfig.directUrl.startsWith('http')) {
+                openAdGate(movie);
+            } else {
+                startVideoPlayback(movie);
+            }
+        }
+
+        function openAdGate(movie) {
+            document.getElementById('adgate-title').textContent = movie.title;
+            document.getElementById('adgate-poster').src = movie.poster;
+            document.getElementById('adgate-modal').classList.remove('hidden');
+            document.getElementById('adgate-modal').classList.add('flex');
+        }
+
+        function closeAdGate() {
+            document.getElementById('adgate-modal').classList.add('hidden');
+            document.getElementById('adgate-modal').classList.remove('flex');
+            pendingMovieToPlay = null;
+        }
+
+        function executeAdGateUnlock() {
+            triggerHaptic('medium');
+
+            // Open Monetag Direct Link in background/new tab
+            if (monetagConfig.directUrl) {
+                window.open(monetagConfig.directUrl, '_blank');
+            }
+
+            document.getElementById('adgate-modal').classList.add('hidden');
+            document.getElementById('adgate-modal').classList.remove('flex');
+
+            if (pendingMovieToPlay) {
+                startVideoPlayback(pendingMovieToPlay);
+            }
+        }
+
+        function startVideoPlayback(movie) {
+            const playerModal = document.getElementById('player-modal');
+            const titleEl = document.getElementById('player-title');
+            const catEl = document.getElementById('player-category');
+            const descEl = document.getElementById('player-desc');
+            const container = document.getElementById('player-container');
+
+            titleEl.textContent = movie.title;
+            catEl.textContent = `${movie.category} • ${movie.quality || 'HD'}`;
+            descEl.textContent = movie.desc || '';
+
+            const url = movie.streamUrl;
+
+            if (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.m3u8')) {
+                container.innerHTML = `
+                    <video controls autoplay class="w-full h-full max-h-[80vh] rounded-xl object-contain">
+                        <source src="${url}" type="video/mp4">
+                        Tu navegador no soporta el reproductor de video HTML5.
+                    </video>
+                `;
+            } else {
+                container.innerHTML = `
+                    <iframe src="${url}" 
+                            class="w-full h-full min-h-[300px] border-0 rounded-xl" 
+                            allowfullscreen 
+                            allow="autoplay; encrypted-media; picture-in-picture">
+                    </iframe>
+                `;
+            }
+
+            playerModal.classList.remove('hidden');
+            playerModal.classList.add('flex');
+        }
+
+        function closePlayer() {
+            triggerHaptic('light');
+            const playerModal = document.getElementById('player-modal');
+            const container = document.getElementById('player-container');
+            container.innerHTML = '';
+            playerModal.classList.add('hidden');
+            playerModal.classList.remove('flex');
+        }
+
+        function shareMovieTelegram() {
+            triggerHaptic('light');
+            if (pendingMovieToPlay) {
+                const encodedData = btoa(encodeURIComponent(JSON.stringify(pendingMovieToPlay)));
+                const shareUrl = `${window.location.origin}${window.location.pathname}?mdata=${encodedData}`;
+                const shareText = `¡Mira "${pendingMovieToPlay.title}" en CineFlix!`;
+
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
+                } else {
+                    copyToClipboardRobust(`${shareText}\n${shareUrl}`, 'Enlace copiado al portapapeles');
+                }
+            }
+        }
+
+        function switchTab(tabId) {
+            triggerHaptic('light');
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-blue-500');
+                btn.classList.add('text-slate-400');
+            });
+
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-blue-500');
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColors = {
+                success: 'bg-emerald-600 text-white',
+                warning: 'bg-amber-600 text-white',
+                info: 'bg-blue-600 text-white'
+            };
+
+            const icons = {
+                success: 'fa-circle-check',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgColors[type] || bgColors.info}`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

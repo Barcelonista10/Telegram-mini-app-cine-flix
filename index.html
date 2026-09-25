@@ -6,6 +6,10 @@
     <title>CineTelegram - Mini App de Películas & Monetag</title>
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Monetag Telegram Mini App SDK -->
+    <script src='//libtl.com/sdk.js' data-zone='11885012' data-sdk='show_11885012'></script>
+    <!-- HLS.js para reproducir streams .m3u8 en navegadores que no lo soportan nativamente -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome for Icons -->
@@ -322,6 +326,9 @@
                 <p id="player-desc" class="text-xs text-slate-300 line-clamp-2">Sinopsis de la película seleccionada.</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+                <button onclick="toggleFullscreenPlayer()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-expand"></i> Pantalla completa
+                </button>
                 <button onclick="shareMovieTelegram()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/20">
                     <i class="fa-solid fa-share-nodes"></i> Compartir
                 </button>
@@ -852,17 +859,39 @@
         function executeAdGateUnlock() {
             triggerHaptic('medium');
 
-            // Open Monetag Direct Link in background/new tab
-            if (monetagConfig.directUrl) {
-                window.open(monetagConfig.directUrl, '_blank');
-            }
-
             document.getElementById('adgate-modal').classList.add('hidden');
             document.getElementById('adgate-modal').classList.remove('flex');
 
-            if (pendingMovieToPlay) {
-                startVideoPlayback(pendingMovieToPlay);
+            const movieToPlay = pendingMovieToPlay;
+            const unlockBtn = document.getElementById('adgate-unlock-btn');
+
+            // Rewarded Interstitial de Monetag: el usuario ve el anuncio completo
+            // y solo entonces se desbloquea la reproducción.
+            if (typeof show_11885012 === 'function') {
+                show_11885012().then(() => {
+                    if (movieToPlay) startVideoPlayback(movieToPlay);
+                }).catch(() => {
+                    // Si el anuncio falla en cargar, igual dejamos ver la película
+                    // para no perder al usuario.
+                    if (movieToPlay) startVideoPlayback(movieToPlay);
+                });
+            } else {
+                // SDK no disponible (ej. probando fuera de Telegram): usa el SmartLink
+                // como respaldo si está configurado, y deja ver la película igual.
+                if (monetagConfig.directUrl && monetagConfig.directUrl.startsWith('http')) {
+                    window.open(monetagConfig.directUrl, '_blank');
+                }
+                if (movieToPlay) startVideoPlayback(movieToPlay);
             }
+        }
+
+        let hlsInstance = null;
+
+        function detectMediaType(url) {
+            const clean = url.split('?')[0].toLowerCase();
+            if (clean.endsWith('.m3u8')) return 'hls';
+            if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.ogg') || clean.endsWith('.mov') || clean.endsWith('.mkv')) return 'video';
+            return 'embed';
         }
 
         function startVideoPlayback(movie) {
@@ -876,21 +905,43 @@
             catEl.textContent = `${movie.category} • ${movie.quality || 'HD'}`;
             descEl.textContent = movie.desc || '';
 
-            const url = movie.streamUrl;
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
 
-            if (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.m3u8')) {
+            const url = movie.streamUrl;
+            const type = detectMediaType(url);
+
+            if (type === 'hls') {
+                container.innerHTML = `<video id="main-video-player" controls autoplay playsinline class="w-full h-full rounded-xl object-contain bg-black"></video>`;
+                const videoEl = document.getElementById('main-video-player');
+
+                if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Safari / iOS reproducen HLS de forma nativa
+                    videoEl.src = url;
+                } else if (window.Hls && window.Hls.isSupported()) {
+                    hlsInstance = new Hls();
+                    hlsInstance.loadSource(url);
+                    hlsInstance.attachMedia(videoEl);
+                } else {
+                    container.innerHTML = `<p class="text-slate-400 text-sm p-4 text-center">Tu navegador no puede reproducir este enlace HLS (.m3u8).</p>`;
+                }
+            } else if (type === 'video') {
+                // Cubre MP4, WebM, MOV y MKV (MKV solo funcionará si el códec interno es compatible)
                 container.innerHTML = `
-                    <video controls autoplay class="w-full h-full max-h-[80vh] rounded-xl object-contain">
-                        <source src="${url}" type="video/mp4">
-                        Tu navegador no soporta el reproductor de video HTML5.
+                    <video id="main-video-player" controls autoplay playsinline class="w-full h-full rounded-xl object-contain bg-black">
+                        <source src="${url}">
+                        Tu navegador no soporta este formato de video.
                     </video>
                 `;
             } else {
+                // Enlaces embed (iframes de terceros)
                 container.innerHTML = `
-                    <iframe src="${url}" 
+                    <iframe id="main-video-player" src="${url}" 
                             class="w-full h-full min-h-[300px] border-0 rounded-xl" 
                             allowfullscreen 
-                            allow="autoplay; encrypted-media; picture-in-picture">
+                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen">
                     </iframe>
                 `;
             }
@@ -899,8 +950,38 @@
             playerModal.classList.add('flex');
         }
 
+        function toggleFullscreenPlayer() {
+            triggerHaptic('light');
+            const el = document.getElementById('main-video-player');
+            if (!el) return;
+
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+                return;
+            }
+
+            if (el.requestFullscreen) {
+                el.requestFullscreen().catch(() => {});
+            } else if (el.webkitRequestFullscreen) {
+                el.webkitRequestFullscreen();
+            } else if (el.webkitEnterFullscreen) {
+                // iOS Safari: fullscreen nativo del elemento <video>
+                el.webkitEnterFullscreen();
+            } else if (el.mozRequestFullScreen) {
+                el.mozRequestFullScreen();
+            } else if (el.msRequestFullscreen) {
+                el.msRequestFullscreen();
+            } else {
+                showToast('Tu navegador no permite pantalla completa aquí', 'warning');
+            }
+        }
+
         function closePlayer() {
             triggerHaptic('light');
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
             const playerModal = document.getElementById('player-modal');
             const container = document.getElementById('player-container');
             container.innerHTML = '';

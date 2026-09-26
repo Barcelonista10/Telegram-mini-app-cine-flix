@@ -192,6 +192,9 @@
                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
                         <input type="password" id="jsonbin-api-key" placeholder="Master Key de JSONBin"
                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+                        <button type="button" onclick="pushMoviesToCloud()" class="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Subir catálogo de este dispositivo a la nube
+                        </button>
                     </div>
 
                     <div>
@@ -443,6 +446,34 @@
                 } catch (err) {
                     console.log('Cloud sync error', err);
                 }
+            }
+        }
+
+        async function pushMoviesToCloud() {
+            const binId = document.getElementById('jsonbin-bin-id').value.trim();
+            const apiKey = document.getElementById('jsonbin-api-key').value.trim();
+
+            if (!binId || !apiKey) {
+                showToast('Primero ingresa el Bin ID y la Master Key', 'warning');
+                return;
+            }
+
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': apiKey
+                    },
+                    body: JSON.stringify(movies)
+                });
+                if (res.ok) {
+                    showToast('Catálogo subido a la nube con éxito', 'success');
+                } else {
+                    showToast('No se pudo subir (revisa el Bin ID / Master Key)', 'warning');
+                }
+            } catch (err) {
+                showToast('Error de red al subir el catálogo', 'warning');
             }
         }
 

@@ -373,10 +373,14 @@
         let adminPin = localStorage.getItem('cine_admin_pin') || '1998';
         let isAdminUnlocked = false;
 
+        // Bin ID público: el mismo para TODOS los usuarios (solo lectura, sin key).
+        // Solo tú, desde el panel admin, guardas la Master Key para poder escribir/actualizar.
+        const CINEFLIX_PUBLIC_BIN_ID = '6ab7272bac6210605af66516';
+
         let monetagConfig = {
             directUrl: localStorage.getItem('monetag_direct_url') || 'https://ototwo.com/4/8888888',
             scriptCode: localStorage.getItem('monetag_script') || '',
-            jsonbinBinId: localStorage.getItem('jsonbin_bin_id') || '',
+            jsonbinBinId: localStorage.getItem('jsonbin_bin_id') || CINEFLIX_PUBLIC_BIN_ID,
             jsonbinApiKey: localStorage.getItem('jsonbin_api_key') || ''
         };
 
@@ -410,21 +414,19 @@
                 movies = [...DEFAULT_MOVIES];
             }
 
-            if (monetagConfig.jsonbinBinId && monetagConfig.jsonbinApiKey) {
-                try {
-                    const res = await fetch(`https://api.jsonbin.io/v3/b/${monetagConfig.jsonbinBinId}/latest`, {
-                        headers: { 'X-Master-Key': monetagConfig.jsonbinApiKey }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.record && Array.isArray(data.record)) {
-                            movies = data.record;
-                            localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
-                        }
+            try {
+                // Lectura PÚBLICA: sin Master Key. Funciona para cualquier usuario,
+                // siempre que el bin esté marcado como "Public" en JSONBin.
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${CINEFLIX_PUBLIC_BIN_ID}/latest`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.record && Array.isArray(data.record)) {
+                        movies = data.record;
+                        localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
                     }
-                } catch (err) {
-                    console.log('Cloud sync fetch fallback to local storage');
                 }
+            } catch (err) {
+                console.log('Cloud sync fetch fallback to local storage');
             }
 
             renderMoviesGrid(movies);

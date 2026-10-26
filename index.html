@@ -1,922 +1,235 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CineFlix - Descargas de Películas</title>
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Monetag Telegram Mini App SDK -->
-    <script src='//libtl.com/sdk.js' data-zone='11885012' data-sdk='show_11885012'></script>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        tg: {
-                            bg: 'var(--tg-theme-bg-color, #0f172a)',
-                            secondary: 'var(--tg-theme-secondary-bg-color, #1e293b)',
-                            text: 'var(--tg-theme-text-color, #f8fafc)',
-                            button: 'var(--tg-theme-button-color, #3b82f6)',
-                            buttonText: 'var(--tg-theme-button-text-color, #ffffff)',
-                            accent: '#0088cc',
-                            monetag: '#22c55e'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        .aspect-poster { aspect-ratio: 2 / 3; }
-        .backdrop-blur-custom {
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canal en Vivo HD</title>
+  <style>
+    :root {
+      --bg: #101a24;
+      --panel: #1c2a38;
+      --panel2: #263747;
+      --text: #f7f9fc;
+      --muted: #a6b6c8;
+      --accent: #d42c82;
+      --blue: #1688d4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .top-line {
+      height: 6px;
+      background: linear-gradient(90deg, #d52d82, #7651b9, #087fc4);
+    }
+    .container { width: min(1180px, 100%); margin: auto; padding: 28px 18px 40px; }
+    .player-wrap {
+      overflow: hidden;
+      border: 2px solid #354351;
+      border-radius: 18px;
+      background: #05090d;
+      box-shadow: 0 18px 38px #0004;
+    }
+    .player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 220px;
+      display: block;
+      border: 0;
+      background: #05090d;
+    }
+    .player-placeholder {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+      background: radial-gradient(ellipse at center, #1d2c3a, #05090d 75%);
+    }
+    .player-placeholder strong { color: white; font-size: clamp(20px, 3vw, 30px); }
+    .player-placeholder p { margin: 10px 0 0; }
+    .info-card {
+      margin-top: 28px;
+      padding: clamp(22px, 4vw, 42px);
+      border-radius: 24px;
+      background: var(--panel);
+      border-left: 8px solid var(--accent);
+      box-shadow: 0 14px 34px #0002;
+    }
+    h1 { margin: 0 0 16px; font-size: clamp(25px, 4vw, 40px); }
+    .notice { margin: 0 0 24px; color: var(--muted); font-size: clamp(16px, 2.5vw, 22px); line-height: 1.55; }
+    .section-title { margin: 28px 0 14px; font-size: 20px; }
+    .channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .channel {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 68px;
+      padding: 14px 16px;
+      text-align: left;
+      color: var(--text);
+      background: var(--panel2);
+      border: 1px solid #3a4c5e;
+      border-radius: 14px;
+      cursor: pointer;
+      font: inherit;
+      transition: background .18s, border-color .18s, transform .18s;
+    }
+    .channel:hover { background: #33495d; transform: translateY(-1px); }
+    .channel.active { border-color: var(--accent); background: #38283b; box-shadow: inset 0 0 0 1px var(--accent); }
+    .channel-icon { font-size: 24px; flex-shrink: 0; }
+    .channel-name { font-weight: 700; }
+    .channel-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+    .action {
+      border: 0; border-radius: 12px; padding: 14px 20px;
+      background: #34485b; color: white; font: inherit; font-weight: 700;
+      cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .action.primary { background: linear-gradient(100deg, #bd2b78, #7352b5); }
+    .action:hover { filter: brightness(1.1); }
+    .gate {
+      margin-top: 18px; padding: 18px; border: 1px solid #46586b;
+      border-radius: 14px; background: #172330;
+    }
+    .gate[hidden] { display: none; }
+    .gate strong { display: block; margin-bottom: 7px; }
+    .gate p { color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+    .footnote { margin: 18px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    @media (max-width: 600px) {
+      .container { padding: 18px 12px 28px; }
+      .info-card { border-left-width: 5px; border-radius: 18px; }
+      .player, .player-placeholder { min-height: 200px; }
+      .channels { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white pb-20">
-
-    <!-- Header Principal -->
-    <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-custom border-b border-slate-800 px-4 py-3 shadow-lg">
-        <div class="max-w-4xl mx-auto flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <!-- Secret Admin Trigger: Tap Logo 3 Times -->
-                <button onclick="handleLogoClick()" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20 text-white font-bold text-lg active:scale-95 transition-transform focus:outline-none" title="CineFlix">
-                    <i class="fa-solid fa-download text-sm"></i>
-                </button>
-                <div>
-                    <h1 class="font-bold text-base tracking-wide flex items-center gap-2">
-                        CineFlix
-                    </h1>
-                    <p class="text-xs text-slate-400 flex items-center gap-1" id="tg-user-greeting">
-                        <i class="fa-solid fa-user-circle text-slate-500"></i> Cargando usuario...
-                    </p>
-                </div>
-            </div>
+<body>
+  <div class="top-line"></div>
+  <main class="container">
+    <div class="player-wrap" id="playerWrap">
+      <div class="player-placeholder" id="placeholder">
+        <div>
+          <strong>📺 Canal en Vivo HD</strong>
+          <p>Selecciona una señal para abrir el reproductor.</p>
         </div>
-    </header>
-
-    <!-- Content Wrapper -->
-    <main class="max-w-4xl mx-auto w-full px-4 pt-4 flex-grow">
-
-        <!-- Dynamic Monetag In-Page Push Placeholder -->
-        <div id="monetag-inpage-slot" class="mb-4 hidden"></div>
-
-        <!-- ================= TAB 1: CATALOG / MOVIES ================= -->
-        <section id="tab-catalog" class="tab-content space-y-4">
-            <!-- Search & Filters -->
-            <div class="flex flex-col sm:flex-row gap-3">
-                <div class="relative flex-grow">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-sm"></i>
-                    <input type="text" id="search-input" onkeyup="filterMovies()" placeholder="Buscar película por título..."
-                           class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-500 transition-all">
-                </div>
-                <select id="genre-filter" onchange="filterMovies()" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500">
-                    <option value="ALL">Todas las Categorías</option>
-                    <option value="Acción">Acción</option>
-                    <option value="Sci-Fi">Sci-Fi</option>
-                    <option value="Animación">Animación</option>
-                    <option value="Drama">Drama</option>
-                    <option value="Terror">Terror</option>
-                </select>
-            </div>
-
-            <!-- Movies Grid Header -->
-            <div class="flex items-center justify-between pt-2">
-                <h2 class="text-sm font-bold tracking-wider uppercase text-slate-400 flex items-center gap-2">
-                    <i class="fa-solid fa-film text-blue-500"></i> Catálogo de Películas
-                </h2>
-                <span class="text-xs text-slate-500" id="movie-count">0 películas</span>
-            </div>
-
-            <!-- Movies Grid -->
-            <div id="movies-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
-        </section>
-
-    </main>
-
-    <!-- ================= SECRET ADMIN MODAL (PROTECTED) ================= -->
-    <div id="admin-login-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative">
-            <button onclick="closeAdminLoginModal()" class="absolute right-4 top-4 text-slate-500 hover:text-slate-300">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-
-            <div class="w-14 h-14 rounded-2xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400 text-2xl font-black">
-                <i class="fa-solid fa-lock"></i>
-            </div>
-
-            <div class="space-y-1">
-                <h3 class="text-base font-bold text-slate-100">Acceso Privado</h3>
-                <p class="text-xs text-slate-400">Ingresa tu clave PIN de seguridad.</p>
-            </div>
-
-            <form onsubmit="verifyAdminPin(event)" class="space-y-3">
-                <input type="password" id="admin-pin-input" maxlength="6" placeholder="PIN Secreto" required
-                       class="w-full text-center tracking-widest text-lg font-bold bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500">
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all text-sm">
-                    Ingresar
-                </button>
-            </form>
-        </div>
+      </div>
     </div>
 
-    <!-- ================= ADMIN MANAGEMENT DASHBOARD MODAL ================= -->
-    <div id="admin-dashboard-modal" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex-col p-4 overflow-y-auto">
-        <div class="max-w-2xl mx-auto w-full space-y-6 my-auto py-6">
+    <section class="info-card">
+      <h1>📺 Canal en Vivo HD</h1>
+      <p class="notice">Selecciona el canal que quieras ver. Si la señal no carga dentro del reproductor, usa el botón para abrirla en una pestaña nueva.</p>
 
-            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-lg">
-                        <i class="fa-solid fa-sliders"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-base font-bold text-slate-100">Panel Privado de Control</h2>
-                        <p class="text-xs text-slate-400">Configuración exclusiva para el dueño de la app</p>
-                    </div>
-                </div>
-                <button onclick="closeAdminDashboardModal()" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
+      <h2 class="section-title">Señales disponibles</h2>
+      <div class="channels" id="channels">
+        <button class="channel" data-name="Evento 1" data-url="https://streamxhd.sbs/live1.php?stream=evento1">
+          <span class="channel-icon">📺</span><span><span class="channel-name">Señal en vivo</span><span class="channel-sub">Evento 1 · Canal HD</span></span>
+        </button>
+      </div>
 
-            <div class="flex border-b border-slate-800 text-xs font-semibold gap-4">
-                <button onclick="switchAdminTab('monetag')" id="admin-tab-btn-monetag" class="pb-2 border-b-2 border-emerald-500 text-emerald-400">
-                    <i class="fa-solid fa-sack-dollar mr-1"></i> Monetización Monetag
-                </button>
-                <button onclick="switchAdminTab('add')" id="admin-tab-btn-add" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
-                    <i class="fa-solid fa-plus-circle mr-1"></i> Agregar Película
-                </button>
-                <button onclick="switchAdminTab('manage')" id="admin-tab-btn-manage" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
-                    <i class="fa-solid fa-list-check mr-1"></i> Gestionar Películas
-                </button>
-            </div>
-
-            <!-- ADMIN TAB 1: MONETAG CONFIG -->
-            <div id="admin-sec-monetag" class="space-y-4">
-                <form onsubmit="saveMonetagSettings(event)" class="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">
-                            Tu Enlace Direct Link de Monetag (SmartLink) *
-                        </label>
-                        <input type="url" id="monetag-direct-url" required placeholder="https://ototwo.com/4/8888888"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
-                        <p class="text-[11px] text-slate-500 mt-1">Se usa como respaldo si el SDK de Monetag no carga (por ejemplo, fuera de Telegram).</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">
-                            Código Script de In-Page Push / Banner (Opcional)
-                        </label>
-                        <textarea id="monetag-script-code" rows="3" placeholder="<script src='//thubanoa.com/...'></script>"
-                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500"></textarea>
-                    </div>
-
-                    <div class="border-t border-slate-800 pt-3 space-y-2">
-                        <label class="block text-xs font-semibold text-emerald-400">
-                            <i class="fa-solid fa-cloud mr-1"></i> Sincronización Global en la Nube (Opcional - JSONBin.io)
-                        </label>
-                        <p class="text-[11px] text-slate-400">Permite sincronizar películas en tiempo real con todos tus usuarios:</p>
-                        <input type="text" id="jsonbin-bin-id" placeholder="Bin ID (Ej. 65f12345a678...)"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
-                        <input type="password" id="jsonbin-api-key" placeholder="Master Key de JSONBin"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
-                        <button type="button" onclick="pushMoviesToCloud()" class="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all">
-                            <i class="fa-solid fa-cloud-arrow-up"></i> Subir catálogo de este dispositivo a la nube
-                        </button>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">
-                            Cambiar PIN de Acceso Admin
-                        </label>
-                        <input type="password" id="change-admin-pin" placeholder="Ingresa nuevo PIN (4 dígitos)"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
-                    </div>
-
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 text-sm">
-                        <i class="fa-solid fa-floppy-disk"></i>
-                        <span>Guardar Configuración Privada</span>
-                    </button>
-                </form>
-            </div>
-
-            <!-- ADMIN TAB 2: ADD MOVIE FORM -->
-            <div id="admin-sec-add" class="hidden space-y-4">
-                <form id="add-movie-form" onsubmit="handleAddMovie(event)" class="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                    <input type="hidden" id="editing-movie-id" value="">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Título de la Película *</label>
-                        <input type="text" id="movie-title" required placeholder="Ej. Avatar: El Camino del Agua"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría *</label>
-                            <select id="movie-category" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
-                                <option value="Acción">Acción</option>
-                                <option value="Sci-Fi">Sci-Fi / Ciencia Ficción</option>
-                                <option value="Animación">Animación</option>
-                                <option value="Drama">Drama / Suspenso</option>
-                                <option value="Terror">Terror</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Calidad</label>
-                            <input type="text" id="movie-quality" placeholder="Ej. 1080p HD"
-                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">URL de la Imagen de Portada (Poster JPG/PNG) *</label>
-                        <input type="url" id="movie-poster" required placeholder="https://m.media-amazon.com/images/M/..."
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">URL de Descarga (enlace directo) *</label>
-                        <input type="url" id="movie-download-url" required placeholder="https://ejemplo.com/descargas/pelicula.mp4"
-                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500">
-                        <p class="text-[11px] text-slate-500 mt-1">Este es el enlace al que se manda al usuario después de ver el anuncio.</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Sinopsis de la Película</label>
-                        <textarea id="movie-desc" rows="2" placeholder="Resumen de la película..."
-                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500"></textarea>
-                    </div>
-
-                    <button type="submit" id="add-movie-submit-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 text-sm">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <span id="add-movie-submit-label">Agregar Película al Catálogo</span>
-                    </button>
-                </form>
-            </div>
-
-            <!-- ADMIN TAB 3: MANAGE / DELETE MOVIES -->
-            <div id="admin-sec-manage" class="hidden space-y-3">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-xs text-slate-400">Películas en el catálogo</span>
-                    <button onclick="copyGithubCode()" class="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1">
-                        <i class="fa-solid fa-code"></i> Copiar Código para GitHub
-                    </button>
-                </div>
-                <div id="admin-movies-list" class="space-y-2 max-h-80 overflow-y-auto pr-1"></div>
-            </div>
-
+      <div class="gate" id="adGate" hidden>
+        <strong>Publicidad antes de la señal</strong>
+        <p>Se abrió el enlace publicitario en otra pestaña. Cuando termines, vuelve aquí y pulsa «Continuar a la señal». Esta página no puede verificar si el anuncio se completó.</p>
+        <div class="actions">
+          <button class="action primary" id="continueBtn" type="button">Continuar a la señal</button>
+          <button class="action" id="cancelBtn" type="button">Cancelar</button>
         </div>
-    </div>
-
-    <!-- ================= MONETAG AD GATE MODAL (USER VIEW) ================= -->
-    <div id="adgate-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative">
-            <button onclick="closeAdGate()" class="absolute right-4 top-4 text-slate-500 hover:text-slate-300">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center mx-auto text-slate-950 text-2xl font-black shadow-lg shadow-emerald-500/30">
-                <i class="fa-solid fa-download text-slate-950"></i>
-            </div>
-
-            <div class="space-y-1">
-                <h3 class="text-lg font-bold text-slate-100">Desbloquear Descarga</h3>
-                <p class="text-xs text-slate-400">Presiona el botón para verificar el servidor y comenzar la descarga.</p>
-            </div>
-
-            <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 text-left flex items-center gap-3">
-                <img id="adgate-poster" src="" class="w-12 h-16 object-cover rounded-lg" alt="Poster">
-                <div class="overflow-hidden text-xs">
-                    <span class="text-slate-500 font-semibold uppercase text-[10px] block">Servidor Online</span>
-                    <strong id="adgate-title" class="text-slate-200 block truncate">Película</strong>
-                    <span class="text-emerald-400 font-medium text-[11px]"><i class="fa-solid fa-check-circle"></i> HD Disponible</span>
-                </div>
-            </div>
-
-            <button id="adgate-unlock-btn" onclick="executeAdGateUnlock()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3.5 rounded-2xl shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm">
-                <i class="fa-solid fa-cloud-arrow-down text-base"></i>
-                <span>Descargar Ahora</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Custom Toast Notification System -->
-    <div id="toast-container" class="fixed top-16 right-4 z-50 space-y-2 pointer-events-none"></div>
-
-    <!-- Bottom Navigation Bar for Mobile -->
-    <nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur-custom border-t border-slate-800 px-6 py-2">
-        <div class="max-w-md mx-auto flex items-center justify-around">
-            <button onclick="switchTab('catalog')" id="nav-catalog" class="nav-btn active flex flex-col items-center gap-1 text-blue-500 transition-colors">
-                <i class="fa-solid fa-film text-lg"></i>
-                <span class="text-[10px] font-semibold">Películas</span>
-            </button>
-            <button onclick="filterByGenre('Acción')" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
-                <i class="fa-solid fa-fire text-lg"></i>
-                <span class="text-[10px] font-semibold">Acción</span>
-            </button>
-            <button onclick="filterByGenre('Animación')" class="nav-btn flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors">
-                <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
-                <span class="text-[10px] font-semibold">Animación</span>
-            </button>
-        </div>
-    </nav>
-
-    <script>
-        // Global State & Data
-        const DEFAULT_MOVIES = [
-            {
-                id: 'm_beetlejuice',
-                title: 'Beetlejuice, el súper fantasma',
-                category: 'Acción',
-                quality: '720p',
-                poster: 'https://m.media-amazon.com/images/M/MV5BMGNhADkxNjAtY2E1YS00MDk4LWE5NjktYzgwZTFhNWVhY2I4XkEyXkFqcGc@._V1_.jpg',
-                downloadUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                desc: 'Un matrimonio de fantasmas contrata a un espíritu travieso para ahuyentar a los nuevos habitantes de su antigua casa.'
-            },
-            {
-                id: 'm1',
-                title: 'Big Buck Bunny (Demo MP4)',
-                category: 'Animación',
-                quality: '4K Ultra HD',
-                poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
-                downloadUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                desc: 'Un conejo gigante de gran corazón lucha contra tres roedores traviesos en esta película animada de código abierto.'
-            },
-            {
-                id: 'm2',
-                title: 'Tears of Steel (Sci-Fi)',
-                category: 'Sci-Fi',
-                quality: '1080p HD',
-                poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Tears_of_Steel_poster.jpg/800px-Tears_of_Steel_poster.jpg',
-                downloadUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-                desc: 'Un grupo de exploradores y soldados intentan rescatar a la tierra en un futuro distópico dominado por robots.'
-            }
-        ];
-
-        let movies = [];
-        let pendingMovieToDownload = null;
-        let logoClickCount = 0;
-        let logoClickTimer = null;
-
-        let adminPin = localStorage.getItem('cine_admin_pin') || '1998';
-        let isAdminUnlocked = false;
-
-        // Bin ID público: el mismo para TODOS los usuarios (solo lectura, sin key).
-        // Solo tú, desde el panel admin, guardas la Master Key para poder escribir/actualizar.
-        const CINEFLIX_PUBLIC_BIN_ID = '6ab7272bac6210605af66516';
-
-        let monetagConfig = {
-            directUrl: localStorage.getItem('monetag_direct_url') || 'https://ototwo.com/4/8888888',
-            scriptCode: localStorage.getItem('monetag_script') || '',
-            jsonbinBinId: localStorage.getItem('jsonbin_bin_id') || CINEFLIX_PUBLIC_BIN_ID,
-            jsonbinApiKey: localStorage.getItem('jsonbin_api_key') || ''
-        };
-
-        window.addEventListener('DOMContentLoaded', () => {
-            initTelegramApp();
-            loadMovies();
-            loadMonetagConfig();
-        });
-
-        function initTelegramApp() {
-            if (window.Telegram && window.Telegram.WebApp) {
-                const tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
-
-                const user = tg.initDataUnsafe?.user;
-                if (user) {
-                    const greetingEl = document.getElementById('tg-user-greeting');
-                    if (greetingEl) {
-                        greetingEl.innerHTML = `<i class="fa-solid fa-user-circle text-blue-400"></i> ${user.first_name || 'Usuario'}`;
-                    }
-                }
-            }
-        }
-
-        async function loadMovies() {
-            const saved = localStorage.getItem('cine_telegram_movies');
-            if (saved) {
-                try { movies = JSON.parse(saved); } catch (e) { movies = [...DEFAULT_MOVIES]; }
-            } else {
-                movies = [...DEFAULT_MOVIES];
-            }
-
-            try {
-                // Lectura PÚBLICA: sin Master Key. Funciona para cualquier usuario,
-                // siempre que el bin esté marcado como "Public" en JSONBin.
-                const res = await fetch(`https://api.jsonbin.io/v3/b/${CINEFLIX_PUBLIC_BIN_ID}/latest`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.record && Array.isArray(data.record)) {
-                        movies = data.record;
-                        localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
-                    }
-                }
-            } catch (err) {
-                console.log('Cloud sync fetch fallback to local storage');
-            }
-
-            renderMoviesGrid(movies);
-        }
-
-        async function saveMoviesState() {
-            localStorage.setItem('cine_telegram_movies', JSON.stringify(movies));
-
-            if (monetagConfig.jsonbinBinId && monetagConfig.jsonbinApiKey) {
-                try {
-                    await fetch(`https://api.jsonbin.io/v3/b/${monetagConfig.jsonbinBinId}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': monetagConfig.jsonbinApiKey
-                        },
-                        body: JSON.stringify(movies)
-                    });
-                } catch (err) {
-                    console.log('Cloud sync error', err);
-                }
-            }
-        }
-
-        async function pushMoviesToCloud() {
-            const binId = document.getElementById('jsonbin-bin-id').value.trim();
-            const apiKey = document.getElementById('jsonbin-api-key').value.trim();
-
-            if (!binId || !apiKey) {
-                showToast('Primero ingresa el Bin ID y la Master Key', 'warning');
-                return;
-            }
-
-            try {
-                const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': apiKey
-                    },
-                    body: JSON.stringify(movies)
-                });
-                if (res.ok) {
-                    showToast('Catálogo subido a la nube con éxito', 'success');
-                } else {
-                    showToast('No se pudo subir (revisa el Bin ID / Master Key)', 'warning');
-                }
-            } catch (err) {
-                showToast('Error de red al subir el catálogo', 'warning');
-            }
-        }
-
-        function handleAddMovie(e) {
-            e.preventDefault();
-            triggerHaptic('medium');
-
-            const editingId = document.getElementById('editing-movie-id').value;
-            const title = document.getElementById('movie-title').value.trim();
-            const category = document.getElementById('movie-category').value;
-            const quality = document.getElementById('movie-quality').value.trim() || 'HD';
-            const poster = document.getElementById('movie-poster').value.trim();
-            const downloadUrl = document.getElementById('movie-download-url').value.trim();
-            const desc = document.getElementById('movie-desc').value.trim();
-
-            if (editingId) {
-                const idx = movies.findIndex(m => m.id === editingId);
-                if (idx !== -1) {
-                    movies[idx] = { ...movies[idx], title, category, quality, poster, downloadUrl, desc: desc || 'Película del catálogo' };
-                    showToast('Película actualizada con éxito', 'success');
-                }
-            } else {
-                const newMovie = {
-                    id: 'm_' + Date.now(),
-                    title,
-                    category,
-                    quality,
-                    poster,
-                    downloadUrl,
-                    desc: desc || 'Película del catálogo'
-                };
-                movies.unshift(newMovie);
-                showToast('Película agregada con éxito', 'success');
-            }
-
-            saveMoviesState();
-            resetAddMovieForm();
-            renderMoviesGrid(movies);
-            switchAdminTab('manage');
-        }
-
-        function resetAddMovieForm() {
-            document.getElementById('add-movie-form').reset();
-            document.getElementById('editing-movie-id').value = '';
-            document.getElementById('add-movie-submit-label').textContent = 'Agregar Película al Catálogo';
-        }
-
-        function editMovie(id) {
-            const movie = movies.find(m => m.id === id);
-            if (!movie) return;
-
-            document.getElementById('editing-movie-id').value = movie.id;
-            document.getElementById('movie-title').value = movie.title;
-            document.getElementById('movie-category').value = movie.category;
-            document.getElementById('movie-quality').value = movie.quality || '';
-            document.getElementById('movie-poster').value = movie.poster;
-            document.getElementById('movie-download-url').value = movie.downloadUrl || '';
-            document.getElementById('movie-desc').value = movie.desc || '';
-            document.getElementById('add-movie-submit-label').textContent = 'Guardar Cambios';
-
-            switchAdminTab('add', false);
-            showToast(`Editando "${movie.title}"`, 'info');
-        }
-
-        function deleteMovie(id) {
-            movies = movies.filter(m => m.id !== id);
-            saveMoviesState();
-            renderMoviesGrid(movies);
-            renderAdminManageList();
-            showToast('Película eliminada', 'info');
-        }
-
-        // Copia robusta: intenta la API moderna, si falla usa un textarea oculto + execCommand,
-        // y si todo falla muestra el texto para copiar a mano.
-        function copyToClipboardRobust(text, successMsg) {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast(successMsg, 'success');
-                }).catch(() => fallbackCopy(text, successMsg));
-            } else {
-                fallbackCopy(text, successMsg);
-            }
-        }
-
-        function fallbackCopy(text, successMsg) {
-            try {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                ta.style.top = '0';
-                document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                const ok = document.execCommand('copy');
-                document.body.removeChild(ta);
-                if (ok) {
-                    showToast(successMsg, 'success');
-                } else {
-                    showManualCopyModal(text);
-                }
-            } catch (e) {
-                showManualCopyModal(text);
-            }
-        }
-
-        function showManualCopyModal(text) {
-            const existing = document.getElementById('manual-copy-modal');
-            if (existing) existing.remove();
-
-            const modal = document.createElement('div');
-            modal.id = 'manual-copy-modal';
-            modal.className = 'fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4';
-            modal.innerHTML = `
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 max-w-sm w-full space-y-3 shadow-2xl">
-                    <h3 class="text-sm font-bold text-slate-100">Copia manual</h3>
-                    <p class="text-xs text-slate-400">Tu navegador no permitió copiar automáticamente. Selecciona el texto y cópialo con el gesto de tu teléfono (mantener presionado).</p>
-                    <textarea readonly class="w-full h-40 bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] font-mono text-slate-200" onclick="this.select()">${text.replace(/</g, '&lt;')}</textarea>
-                    <button onclick="document.getElementById('manual-copy-modal').remove()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-sm">Cerrar</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-
-        function copyGithubCode() {
-            const formattedCode = `const DEFAULT_MOVIES = ${JSON.stringify(movies, null, 4)};`;
-            copyToClipboardRobust(formattedCode, 'Código copiado. Pégalo en tu index.html de GitHub');
-        }
-
-        function loadMonetagConfig() {
-            document.getElementById('monetag-direct-url').value = monetagConfig.directUrl;
-            document.getElementById('monetag-script-code').value = monetagConfig.scriptCode;
-            document.getElementById('jsonbin-bin-id').value = monetagConfig.jsonbinBinId;
-            document.getElementById('jsonbin-api-key').value = monetagConfig.jsonbinApiKey;
-
-            if (monetagConfig.scriptCode) {
-                const slot = document.getElementById('monetag-inpage-slot');
-                slot.innerHTML = monetagConfig.scriptCode;
-                slot.classList.remove('hidden');
-            }
-        }
-
-        function saveMonetagSettings(e) {
-            e.preventDefault();
-            triggerHaptic('medium');
-
-            monetagConfig.directUrl = document.getElementById('monetag-direct-url').value.trim();
-            monetagConfig.scriptCode = document.getElementById('monetag-script-code').value.trim();
-            monetagConfig.jsonbinBinId = document.getElementById('jsonbin-bin-id').value.trim();
-            monetagConfig.jsonbinApiKey = document.getElementById('jsonbin-api-key').value.trim();
-
-            const newPin = document.getElementById('change-admin-pin').value.trim();
-            if (newPin && newPin.length >= 4) {
-                adminPin = newPin;
-                localStorage.setItem('cine_admin_pin', newPin);
-                document.getElementById('change-admin-pin').value = '';
-                showToast('PIN de Admin actualizado', 'success');
-            }
-
-            localStorage.setItem('monetag_direct_url', monetagConfig.directUrl);
-            localStorage.setItem('monetag_script', monetagConfig.scriptCode);
-            localStorage.setItem('jsonbin_bin_id', monetagConfig.jsonbinBinId);
-            localStorage.setItem('jsonbin_api_key', monetagConfig.jsonbinApiKey);
-
-            loadMonetagConfig();
-            loadMovies();
-            showToast('Ajustes guardados correctamente', 'success');
-            closeAdminDashboardModal();
-        }
-
-        function triggerHaptic(style = 'light') {
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                window.Telegram.WebApp.HapticFeedback.impactOccurred(style);
-            }
-        }
-
-        // Secret Logo Tap Handler (3 quick clicks to unlock Admin)
-        function handleLogoClick() {
-            logoClickCount++;
-            clearTimeout(logoClickTimer);
-            logoClickTimer = setTimeout(() => { logoClickCount = 0; }, 1200);
-
-            if (logoClickCount >= 3) {
-                logoClickCount = 0;
-                triggerHaptic('medium');
-                if (isAdminUnlocked) {
-                    openAdminDashboardModal();
-                } else {
-                    openAdminLoginModal();
-                }
-            }
-        }
-
-        function openAdminLoginModal() {
-            document.getElementById('admin-pin-input').value = '';
-            document.getElementById('admin-login-modal').classList.remove('hidden');
-        }
-
-        function closeAdminLoginModal() {
-            document.getElementById('admin-login-modal').classList.add('hidden');
-        }
-
-        function verifyAdminPin(e) {
-            e.preventDefault();
-            const enteredPin = document.getElementById('admin-pin-input').value.trim();
-            if (enteredPin === adminPin) {
-                isAdminUnlocked = true;
-                closeAdminLoginModal();
-                showToast('Acceso Admin Concedido', 'success');
-                openAdminDashboardModal();
-            } else {
-                showToast('PIN Incorrecto', 'warning');
-            }
-        }
-
-        function openAdminDashboardModal() {
-            document.getElementById('admin-dashboard-modal').classList.remove('hidden');
-            document.getElementById('admin-dashboard-modal').classList.add('flex');
-            renderAdminManageList();
-        }
-
-        function closeAdminDashboardModal() {
-            document.getElementById('admin-dashboard-modal').classList.add('hidden');
-            document.getElementById('admin-dashboard-modal').classList.remove('flex');
-        }
-
-        function switchAdminTab(tabName, resetForm = true) {
-            document.getElementById('admin-sec-monetag').classList.add('hidden');
-            document.getElementById('admin-sec-add').classList.add('hidden');
-            document.getElementById('admin-sec-manage').classList.add('hidden');
-
-            document.getElementById('admin-tab-btn-monetag').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
-            document.getElementById('admin-tab-btn-add').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
-            document.getElementById('admin-tab-btn-manage').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
-
-            if (tabName === 'monetag') {
-                document.getElementById('admin-sec-monetag').classList.remove('hidden');
-                document.getElementById('admin-tab-btn-monetag').className = "pb-2 border-b-2 border-emerald-500 text-emerald-400";
-            } else if (tabName === 'add') {
-                if (resetForm) resetAddMovieForm();
-                document.getElementById('admin-sec-add').classList.remove('hidden');
-                document.getElementById('admin-tab-btn-add').className = "pb-2 border-b-2 border-blue-500 text-blue-400";
-            } else if (tabName === 'manage') {
-                document.getElementById('admin-sec-manage').classList.remove('hidden');
-                document.getElementById('admin-tab-btn-manage').className = "pb-2 border-b-2 border-amber-500 text-amber-400";
-                renderAdminManageList();
-            }
-        }
-
-        function renderMoviesGrid(items) {
-            const grid = document.getElementById('movies-grid');
-            const countEl = document.getElementById('movie-count');
-            countEl.textContent = `${items.length} película${items.length === 1 ? '' : 's'}`;
-
-            if (items.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full py-12 text-center text-slate-500">
-                        <i class="fa-solid fa-film text-4xl mb-2 opacity-50"></i>
-                        <p class="text-sm font-medium">No hay películas en esta sección</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = items.map(m => `
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition-all flex flex-col justify-between group shadow-lg">
-                    <div class="relative aspect-poster bg-slate-950 overflow-hidden">
-                        <img src="${m.poster}" alt="${m.title}"
-                             onerror="this.src='https://placehold.co/400x600/0f172a/94a3b8?text=Poster'"
-                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
-                        <span class="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-md text-blue-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-800">
-                            ${m.quality || 'HD'}
-                        </span>
-                        <button onclick="requestMovieDownload('${m.id}')" class="absolute inset-0 flex items-center justify-center bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg shadow-xl shadow-blue-600/50 scale-90 group-hover:scale-100 transition-transform">
-                                <i class="fa-solid fa-download"></i>
-                            </div>
-                        </button>
-                    </div>
-                    <div class="p-3 space-y-1 flex-grow flex flex-col justify-between">
-                        <div>
-                            <span class="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">${m.category}</span>
-                            <h3 class="font-bold text-xs text-slate-100 line-clamp-1 group-hover:text-blue-400 transition-colors" title="${m.title}">${m.title}</h3>
-                        </div>
-                        <div class="pt-2 flex items-center justify-between gap-1 border-t border-slate-800/60">
-                            <button onclick="requestMovieDownload('${m.id}')" class="w-full bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1">
-                                <i class="fa-solid fa-download text-[10px]"></i> Descargar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function filterMovies() {
-            const query = document.getElementById('search-input').value.toLowerCase();
-            const genre = document.getElementById('genre-filter').value;
-
-            const filtered = movies.filter(m => {
-                const matchesSearch = m.title.toLowerCase().includes(query);
-                const matchesGenre = genre === 'ALL' || m.category === genre;
-                return matchesSearch && matchesGenre;
-            });
-
-            renderMoviesGrid(filtered);
-        }
-
-        function filterByGenre(genreName) {
-            document.getElementById('genre-filter').value = genreName;
-            filterMovies();
-        }
-
-        function renderAdminManageList() {
-            const container = document.getElementById('admin-movies-list');
-            if (movies.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">No hay películas creadas.</p>`;
-                return;
-            }
-
-            container.innerHTML = movies.map(m => `
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3 truncate">
-                        <img src="${m.poster}" class="w-10 h-14 object-cover rounded-md" onerror="this.src='https://placehold.co/100x150/0f172a/94a3b8?text=Poster'">
-                        <div class="truncate text-xs">
-                            <strong class="text-slate-200 block truncate">${m.title}</strong>
-                            <span class="text-slate-500">${m.category} • ${m.quality}</span>
-                        </div>
-                    </div>
-                    <button onclick="editMovie('${m.id}')" class="text-blue-400 hover:text-blue-300 p-2 text-sm shrink-0" title="Editar">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                    <button onclick="deleteMovie('${m.id}')" class="text-red-400 hover:text-red-300 p-2 text-sm shrink-0" title="Eliminar">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-
-        function requestMovieDownload(movieId) {
-            triggerHaptic('light');
-            const movie = movies.find(m => m.id === movieId);
-            if (!movie) return;
-
-            pendingMovieToDownload = movie;
-
-            document.getElementById('adgate-title').textContent = movie.title;
-            document.getElementById('adgate-poster').src = movie.poster;
-            document.getElementById('adgate-modal').classList.remove('hidden');
-            document.getElementById('adgate-modal').classList.add('flex');
-        }
-
-        function closeAdGate() {
-            document.getElementById('adgate-modal').classList.add('hidden');
-            document.getElementById('adgate-modal').classList.remove('flex');
-            pendingMovieToDownload = null;
-        }
-
-        function executeAdGateUnlock() {
-            triggerHaptic('medium');
-
-            document.getElementById('adgate-modal').classList.add('hidden');
-            document.getElementById('adgate-modal').classList.remove('flex');
-
-            const movieToDownload = pendingMovieToDownload;
-
-            // Rewarded Interstitial de Monetag: el usuario ve el anuncio completo
-            // y solo entonces se dispara la descarga.
-            if (typeof show_11885012 === 'function') {
-                show_11885012().then(() => {
-                    triggerDownload(movieToDownload);
-                }).catch(() => {
-                    // Si el anuncio falla en cargar, igual dejamos descargar
-                    // para no perder al usuario.
-                    triggerDownload(movieToDownload);
-                });
-            } else {
-                // SDK no disponible (ej. probando fuera de Telegram): usa el SmartLink
-                // como respaldo si está configurado, y deja descargar igual.
-                if (monetagConfig.directUrl && monetagConfig.directUrl.startsWith('http')) {
-                    window.open(monetagConfig.directUrl, '_blank');
-                }
-                triggerDownload(movieToDownload);
-            }
-        }
-
-        function triggerDownload(movie) {
-            if (!movie || !movie.downloadUrl) {
-                showToast('Esta película no tiene un enlace de descarga configurado', 'warning');
-                return;
-            }
-            showToast(`Iniciando descarga de "${movie.title}"`, 'success');
-            window.open(movie.downloadUrl, '_blank');
-        }
-
-        function switchTab(tabId) {
-            triggerHaptic('light');
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-
-            const activeTab = document.getElementById(`tab-${tabId}`);
-            if (activeTab) activeTab.classList.remove('hidden');
-
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('text-blue-500');
-                btn.classList.add('text-slate-400');
-            });
-
-            const activeBtn = document.getElementById(`nav-${tabId}`);
-            if (activeBtn) {
-                activeBtn.classList.remove('text-slate-400');
-                activeBtn.classList.add('text-blue-500');
-            }
-        }
-
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-
-            const bgColors = {
-                success: 'bg-emerald-600 text-white',
-                warning: 'bg-amber-600 text-white',
-                info: 'bg-blue-600 text-white'
-            };
-
-            const icons = {
-                success: 'fa-circle-check',
-                warning: 'fa-triangle-exclamation',
-                info: 'fa-circle-info'
-            };
-
-            toast.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgColors[type] || bgColors.info}`;
-            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> <span>${message}</span>`;
-
-            container.appendChild(toast);
-
-            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-    </script>
+      </div>
+      <div class="actions">
+        <button class="action primary" id="reloadBtn" type="button">↻ Recargar reproductor</button>
+        <a class="action" id="openBtn" href="#" target="_blank" rel="noopener noreferrer" hidden>↗ Abrir señal en otra pestaña</a>
+      </div>
+      <p class="footnote">Nota: el enlace publicitario se abre en una pestaña aparte. Algunos sitios externos bloquean la reproducción integrada. Utiliza fuentes de transmisión que tengas autorización para reproducir.</p>
+    </section>
+  </main>
+
+  <script>
+    const playerWrap = document.getElementById('playerWrap');
+    const openBtn = document.getElementById('openBtn');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const adGate = document.getElementById('adGate');
+    const continueBtn = document.getElementById('continueBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const channelButtons = [...document.querySelectorAll('.channel')];
+
+    const SMARTLINK_URL = 'https://auctionr.org/4/b475537bac98538b15e0b952c8d48727';
+    let selectedUrl = '';
+    let selectedButton = null;
+    let waitingForAdReturn = false;
+    let signalLoaded = false;
+
+    function loadSelectedSignal() {
+      if (!selectedUrl) return;
+      playerWrap.innerHTML = '';
+      const frame = document.createElement('iframe');
+      frame.className = 'player';
+      frame.title = selectedButton ? selectedButton.dataset.name : 'Canal en Vivo HD';
+      frame.src = selectedUrl;
+      frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      frame.allowFullscreen = true;
+      frame.referrerPolicy = 'no-referrer';
+      frame.loading = 'eager';
+      playerWrap.appendChild(frame);
+      openBtn.href = selectedUrl;
+      openBtn.hidden = false;
+      adGate.hidden = true;
+      waitingForAdReturn = false;
+      signalLoaded = true;
+    }
+
+    function selectChannel(button) {
+      selectedButton = button;
+      selectedUrl = button.dataset.url;
+      signalLoaded = false;
+      waitingForAdReturn = true;
+      channelButtons.forEach(item => item.classList.toggle('active', item === button));
+
+      // El Smartlink se abre solo después del clic del usuario.
+      window.open(SMARTLINK_URL, '_blank');
+      adGate.hidden = false;
+      adGate.querySelector('p').textContent =
+        'Cuando termines con la página publicitaria, vuelve a esta pestaña. Intentaremos activar la señal automáticamente. Si no se activa, pulsa «Continuar a la señal». Este sitio no puede verificar si el anuncio se vio completo.';
+    }
+
+    // Al volver desde la pestaña publicitaria, intenta cargar la señal seleccionada.
+    // Esto detecta el regreso a la página, NO la finalización del anuncio.
+    function onReturnFromAd() {
+      if (waitingForAdReturn && !signalLoaded && selectedUrl) {
+        loadSelectedSignal();
+      }
+    }
+    window.addEventListener('focus', onReturnFromAd);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onReturnFromAd();
+    });
+
+    channelButtons.forEach(button => button.addEventListener('click', () => selectChannel(button)));
+    continueBtn.addEventListener('click', loadSelectedSignal);
+    cancelBtn.addEventListener('click', () => {
+      adGate.hidden = true;
+      selectedUrl = '';
+      selectedButton = null;
+      waitingForAdReturn = false;
+      signalLoaded = false;
+      channelButtons.forEach(item => item.classList.remove('active'));
+    });
+
+    reloadBtn.addEventListener('click', () => {
+      const frame = playerWrap.querySelector('iframe');
+      if (!frame) {
+        playerWrap.innerHTML = '<div class="player-placeholder"><div><strong>📺 Canal en Vivo HD</strong><p>Primero selecciona una señal.</p></div></div>';
+        return;
+      }
+      const current = frame.src;
+      frame.src = 'about:blank';
+      window.setTimeout(() => { frame.src = current; }, 100);
+    });
+  </script>
 </body>
 </html>
